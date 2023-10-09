@@ -1,0 +1,81 @@
+---
+title: "Assignment-2_Simple Linear Regression"
+output: html_document
+date: "2023-09-08"
+---
+Libraries
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(lmtest)
+```
+# Question 1 How many rows are in the “air” dataframe?
+#Question 2 How many columns are in the “air” dataframe?
+```{r}
+air = airquality
+```
+
+```{r}
+str(airquality)
+```
+# Question 4 Which variable is most likely to be the response (Y) variable?
+```{r}
+ggpairs(air) 
+```
+# Question 5 How many rows remain in this new (air2) data frame?
+# Question 6 How many columns remain in this new (air2) data frame?
+```{r}
+air2 = air %>% drop_na()
+```
+# Use the “ggpairs” function to develop a visualization of the relationships in this dataset and to show correlation values for the combinations of variables.
+```{r}
+ggpairs(air2)
+```
+# Question 7 Which variable is most strongly correlated with the “Ozone” variable?
+# Question 8 Which variable is least strongly correlated with the “Ozone” variable?
+```{r}
+ggcorr(air2, label = TRUE)
+```
+# Question 9 Plot “Temp” (x axis) versus “Ozone” (y axis) using the “ggplot” function. Choose an appropriate chart type. Which statement best describes the relationship between “Temp” and “Ozone”?
+
+```{r}
+ggplot(air2, aes(x=Temp ,y=Ozone)) + geom_point() + theme_bw() +
+geom_smooth(method ="lm", se=FALSE, color="red") + theme_bw()
+```
+# Use Tidymodels to create a linear regression model using “Temp” to predict “Ozone”. You miss wish to call your model fit “lm_fit”.
+# Question 10 What is the slope of this regression model (to four decimal places)?
+# Question 11 what is the R-squared value of this model (not Adjusted R-squared) (to three decimal places)?
+# Question 12 Is the “Temp” variables significant in the model?
+```{r}
+air_2_simple = recipe(Ozone ~ Temp, air2)
+
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(air_2_simple)
+
+lm_fit = fit(lm_wflow, air2)
+```
+
+```{r}
+summary(lm_fit$fit$fit$fit)
+```
+```{r}
+slope <- coef(lm_fit$fit$fit$fit)["Temp"]
+```
+
+# Question 13 Use the code below to generate 95% confidence intervals for the coefficients. Note that you may need to change “lm_fit” to the name of your model fit if you used a different name.
+```{r}
+confint(lm_fit$fit$fit$fit)
+```
+# Question 14: Using your linear regression model with “Temp” to predict “Ozone”, what is the predicted. “Ozone” value when “Temp” is equal to 80 (to two decimal places)?
+```{r}
+testdata <-data.frame(
+predict(lm_fit, new_data = testdata)
+```
+

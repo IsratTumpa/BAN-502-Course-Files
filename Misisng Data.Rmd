@@ -1,0 +1,64 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+---
+title: "Missing Data"
+
+```{r}
+library(tidyverse)
+library(VIM)
+library(mice)
+library(skimr)
+library(naniar)
+library(UpSetR)
+```
+
+```{r}
+library(readr)
+class_grades <- read_csv("class-grades.csv")
+View(class_grades)
+```
+
+# Task 1:For which variables is there missing data?
+
+```{r}
+str(class_grades)
+summary(class_grades)
+skim(class_grades)
+```
+
+#Task 2:Use the VIM package to visualize missingness. Are there any students that are missing multiplepieces of data?
+
+```{r}
+gg_miss_var(class_grades)
+vis_miss(class_grades)
+```
+
+#Task 3:Use row-wise deletion of missing values to create a new data frame. How many rows remain in this data frame?
+
+```{r}
+class_gradesrowdel = class_grades %>% drop_na()
+skim(class_gradesrowdel)
+```
+
+# Task 4: Use column-wise deletion of missing values to create a new data frame (from the original data frame not from the data frame created in Task 3). How many columns remain in this data frame?
+
+```{r}
+class_gradescoldel = class_grades %>% select(- Tutorial, -Midterm, -TakeHome, -Final)
+vim_plot = aggr(class_gradescoldel, numbers = TRUE, prop = c(TRUE, FALSE), cex.axis=.7)
+skim(class_gradescoldel)
+```
+# Task 6 Use the “mice” package to impute the missing data in this dataset. Set “m = 5” and “method =”pmm"" in the imputation. You MUST use a random number seed of 123 for this imputation. What is the mean value for the “Final” variable after imputation?
+
+```{r}
+set.seed(123)
+imp_Final =mice(class_grades, m=5, method = 'pmm' , printFlag = FALSE)
+summary(imp_Final)
+```
+```{r}
+class_grades_complete = complete(imp_Final)
+summary(class_grades_complete)
+```
+

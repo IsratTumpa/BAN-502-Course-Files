@@ -1,0 +1,185 @@
+---
+output:
+  word_document: default
+---
+---
+title: "Assignment-2_Logistic Regression"
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(e1071)
+library(ROCR)
+```
+
+```{r}
+library(readr)
+parole <- read_csv("parole.csv")
+View(parole)
+```
+# Converted and recode the variables
+```{r}
+parole = parole %>% mutate(male = as_factor(male)) %>%
+  mutate(male = fct_recode(male, "male" = "1", "female" = "0"))
+str(parole)
+summary(parole)
+```
+
+```{r}
+parole = parole %>% mutate(race = as_factor(race)) %>% 
+  mutate(race = fct_recode(race, "white" = "1", "otherwise" = "2"))
+str(parole)
+summary(parole)
+```
+
+```{r}
+parole = parole %>% mutate(state = as_factor(state)) %>% 
+  mutate(state = fct_recode(state, "Kentucky" = "2", "Louisiana" = "3", "Virginia" = "4", "any state" = "1"))
+str(parole)
+summary(parole)
+```
+
+```{r}
+parole = parole %>% mutate(crime = as_factor(crime)) %>% 
+  mutate(crime = fct_recode(crime, "larceny" = "2", "drug" = "3", "driving" = "4", "other" = "1"))
+str(parole)
+summary(parole)
+```
+
+```{r}
+parole = parole %>% mutate(multiple.offenses= as_factor(multiple.offenses)) %>% 
+  mutate(multiple.offenses = fct_recode(multiple.offenses, "Yes" = "1", "No" = "0"))
+str(parole)
+summary(parole)
+```
+
+```{r}
+parole = parole %>% mutate(violator = as_factor(violator)) %>% 
+  mutate(violator = fct_recode(violator, "Yes" = "1", "No" = "0"))
+str(parole)
+summary(parole)
+```
+# Question 2: Split the data into training and testing sets. Your training set should have 70% of the data. Use a random number (set.seed) of 12345. Be sure that the split is stratified by “violator”.
+
+```{r}
+set.seed(12345)
+parole_split = initial_split(parole, prop = 0.70, strata = violator)
+train = training(parole_split)
+test = testing(parole_split)
+```
+
+```{r}
+levels(train$violator)
+```
+
+```{r}
+train = train %>% mutate(violator = fct_relevel(violator, c("No","Yes")))
+levels(train$violator)
+```
+# Question 3: Our objective is to predict whether or not a parolee will violate his/her parole. In this task, use appropriate data visualizations and/or tables to examine the relationship between each variable and the response variable “violator”. Use your visualizations to answer the questions below.
+True/False: The violation rate appears slightly higher among males than among females.
+```{r}
+ggplot(parole, aes(x= "male", fill = violator)) + geom_bar() + theme_bw() 
+```
+# Question 4: True/False: The violation rate is considerably higher in Louisiana than in the other states.
+```{r}
+ggplot(parole, aes(x= "Louisiana", fill = violator)) + geom_bar() + theme_bw() 
+```
+# Question 5: True/False: The violation rate appears slightly higher among parolees with shorter “max_sentence” values.
+```{r}
+ggplot(parole, aes(x= "max.sentence", fill = violator)) + geom_bar() + theme_bw() 
+```
+# Question 6: Create a logistic regression model using the “state” variable to predict “violator”.
+```{r}
+train_model =
+  logistic_reg() %>%
+  set_engine("glm")
+
+train_recipe = recipe(violator ~ state, train) 
+ 
+
+ logreg_wf = workflow() %>%
+  add_recipe(parole_recipe) %>%
+  add_model(parole_model)
+
+train_fit = fit(logreg_wf, train)
+```
+# Question 7 To two decimal places, what is the AIC of the model with “state” to predict “violator”?
+```{r}
+summary(train_fit$fit$fit$fit)
+```
+
+```{r}
+str(parole)
+```
+# Question 8 Create a logistic regression model using the training set to predict “violator” using the variables: “state”, “multiple.offenses”, and “race”
+```{r}
+train1_model =
+  logistic_reg() %>%
+  set_engine("glm")
+
+train1_recipe = recipe(violator ~ state + multiple.offenses + race, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+  logreg_wf = workflow() %>%
+  add_recipe(train_recipe) %>%
+  add_model(parole_model)
+
+train_fit2 = fit(logreg_wf, train)
+```
+
+```{r}
+summary(train_fit2$fit$fit$fit)
+```
+# Question 9: Use your model from Question 8 to determine the probability (to two decimal places) that the following parolee will violate parole: The parolee is in Louisiana, has multiple offenses, and is white.
+```{r}
+testdata =data.frame( state = "Louisiana", race = "white", multiple.offenses = "Yes")
+predictions = predict(train_fit2, testdata, type="prob")
+head(predictions)
+```
+# Question 10: Continuing to use your model from Question 8, develop an ROC curve and determine the probability threshold that best balances specificity and sensitivity (on the training set). Be sure to be careful with the predict function syntax.
+
+```{r}
+predictions2 = predict(train_fit2, train, type="prob")[2]
+head(predictions2)
+```
+#
+```{r}
+ROCRpred = prediction(predictions2, train$violator)
+
+ROCRperf = performance(ROCRpred, "tpr" , "fpr")
+plot(ROCRperf, colorsize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+```
+
+```{r}
+as.numeric(performance(ROCRpred, "auc")@y.values)
+```
+# Sensitivity and specificity
+
+```{r}
+opt.cut = function(perf, pred) {
+  cut.ind = mapply(FUN=function(x, y, p) {
+    d = (x -0)^2 + (y-1)^2
+    ind = which(d==min(d))
+    c(sensitivity = y [[ind]], specificity = 1-x[[ind]],
+      cutoff = p[[ind]])
+    }, perf@x.values , perf@y.values, pred@cutoffs)
+}
+print(opt.cut(ROCRperf, ROCRpred))
+```
+```{r}
+t1 = table(train$violator, predictions2 > 0.2015788)
+t1
+```
+```{r}
+(t1[1,1]+t1[2,2])/nrow(train)
+```
+# sensitivity
+```{r}
+36/(36+18)
+```
+
+
+
+
+

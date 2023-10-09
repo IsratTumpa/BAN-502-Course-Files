@@ -1,0 +1,142 @@
+
+title: "Assignment-3_Random Forests"
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(gridExtra)
+library(vip)
+library(ranger)
+library(skimr)
+```
+
+```{r}
+library(readr)
+drug_data_2 <- read_csv("drug_data-2.csv")
+View(drug_data_2)
+```
+
+```{r}
+drug = drug_data_2
+summary(drug)
+```
+
+```{r}
+names(drug) = c("ID", "Age", "Gender", "Education", "Country", "Ethnicity",
+                "Nscore", "Escore", "Oscore", "Ascore", "Cscore", "Impulsive",
+                "SS", "Alcohol", "Amphet", "Amyl", "Benzos", "Caff", "Cannabis",
+                "Choc", "Coke", "Crack", "Ecstasy", "Heroin", "Ketamine", "Legalh",
+                "LSD", "Meth", "Mushrooms", "Nicotine", "Semer", "VSA")
+```
+
+```{r}
+drug[drug == "CL0"] = "No"
+drug[drug == "CL1"] = "No"
+drug[drug == "CL2"] = "Yes"
+drug[drug == "CL3"] = "Yes"
+drug[drug == "CL4"] = "Yes"
+drug[drug == "CL5"] = "Yes"
+drug[drug == "CL6"] = "Yes"
+```
+
+# data cleaning
+```{r}
+drug_clean = drug %>% mutate_at(vars(Age:Ethnicity), funs(as_factor)) %>%
+      mutate(Age = factor(Age, labels = c("18_24", "25_34", "35_44", "45_54",
+                                          "55_64", "65_"))) %>%
+      mutate(Gender = factor(Gender, labels = c("Male", "Female"))) %>%
+      mutate(Education = factor(Education, labels = c("Under16", "At16", "At17", "At18",
+                                                      "SomeCollege","ProfessionalCert",
+                                                      "Bachelors", "Masters",
+                                                      "Doctorate"))) %>%
+       mutate(Country = factor(Country, labels = c("USA", "NewZealand", "Other", "Australia" ,
+                                                  "Ireland","Canada","UK"))) %>%
+      mutate(Ethnicity = factor(Ethnicity, labels = c("Black", "Asian", "White",
+                                                      "White/Black", "Other",
+                                                      "White/Asian", "Black/Asian"))) %>%
+      mutate_at(vars(Alcohol:VSA), funs(as_factor)) %>% select(-ID)
+```
+
+```{r}
+str(drug_clean)
+```
+
+# We’ll focus on Nicotine use, so let’s get rid of the remaining drug use variables. We’ll use select for this.
+```{r}
+drug_clean = drug_clean %>% select(!(Alcohol:Mushrooms)) %>% select(!(Semer:VSA))
+```
+
+# Question 1: Check for missing data in our “drug_clean” dataframe.
+
+```{r}
+skim(drug_clean)
+```
+
+# Question 2: Split the dataset into training (70%) and testing (30%) sets. Use a set.seed of 1234. Stratify by the “Nicotine” variable.
+
+```{r}
+set.seed(1234)
+drug_clean_split = initial_split(drug_clean, prop = 0.7, strata = Nicotine)
+train = training(drug_clean_split)
+test = testing(drug_clean_split)
+```
+
+# Question 3: Create appropriate visualizations (12 in all) to examine the relationships between each variable and “Nicotine”. Use grid.arrange (from the gridExtra package) to organize these visuals (perhaps in groups of four visualizations?).
+
+```{r}
+p1 = ggplot(train, aes(x = Age, fill = Nicotine)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = Gender, fill = Nicotine)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = Education, fill = Nicotine)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = Country, fill = Nicotine)) + geom_bar(position = "fill")
+p5 = ggplot(train, aes(x = Ethnicity, fill = Nicotine)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4,p5)
+```
+# Question 6: Use the best mtry and min_n values from Question 5 to finalize the workflow and fit the model to training set. Examine variable importance.Which variable is most important?
+```{r}
+p1 = ggplot(train, aes(x= Nicotine, y = Nscore)) + geom_boxplot()
+p2 = ggplot(train, aes(x = Nicotine, y = Escore)) + geom_boxplot()
+p3 = ggplot(train, aes(x = Nicotine, y = Oscore)) + geom_boxplot()
+grid.arrange(p1,p2,p3, ncol = 2)
+```
+```{r}
+p1 = ggplot(train, aes(x= Nicotine, y = Ascore)) + geom_boxplot()
+p2 = ggplot(train, aes(x= Nicotine, y = Cscore)) + geom_boxplot()
+p3 = ggplot(train, aes(x= Nicotine, y = Impulsive)) + geom_boxplot()
+p4 = ggplot(train, aes(x= Nicotine, y = SS)) + geom_boxplot()
+grid.arrange(p1,p2,p3,p4, ncol = 2)
+```
+# Question 7: To four decimal places, what is the accuracy of your model on the training set?
+
+```{r}
+drug_recipe = recipe(Nicotine ~. , train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+rf_model = rand_forest() %>%
+  set_engine("ranger", importance = "permutation") %>%
+  set_mode("classification")
+
+drug_wflow =
+  workflow() %>%
+  add_model(rf_model) %>%
+  add_recipe(drug_recipe)
+
+set.seed(123)
+drug_fit = fit(drug_wflow, train)
+```
+
+```{r}
+trainpredrf = predict(drug_fit, train)
+head(trainpredrf)
+```
+```{r}
+confusionMatrix(trainpredrf$.pred_class, train$Nicotine, positive = "Yes")
+```
+# Predict for test
+
+```{r}
+testpredrf = predict(drug_clean_fit, test)
+head(testpredrf)
+confusionMatrix(testpredrf$.pred_class, test$Nicotine, positive = "Yes")
+```
+

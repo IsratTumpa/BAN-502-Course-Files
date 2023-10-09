@@ -1,0 +1,135 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+# Assignment 2
+# Multiple Linear Regression and Special Issues
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(car)
+library(lubridate)
+library(lmtest)
+library(splines)
+```
+
+```{r}
+bike_cleaned_3 <- read_csv("bike_cleaned-3.csv")
+View(bike_cleaned_3)
+```
+
+```{r}
+bike = bike_cleaned_3
+summary(bike)
+```
+
+# Convert “dteday” from a character variable to a date variable. The code below will perform this conversion:
+```{r}
+bike = bike %>% mutate(dteday = mdy(dteday))
+summary(bike)
+```
+# Convert the remaining character variables to factors.
+```{r}
+ bike = bike %>% mutate_if(is.character, as_factor)
+```
+# Convert the "hr" variable into factors.
+```{r}
+bike = bike %>% mutate(hr = as_factor(hr))
+```
+
+
+```{r}
+str(bike)
+```
+
+# Question 1 Which of the quantitative variables appears to be best correlated with “count”? NOTE: Ignore the “registered” and “casual” variable as the sum of these two variables equals “count”. Because these variables combine to make the response variable, they cannot be used as predictors. You can also ignore the“instant” variable as it is just a row number.
+
+```{r}
+ggpairs (bike, columns =  c("windspeed", "hum", "atemp", "temp", "count"))
+```
+# If you create a boxplot for “hr” and “count” you will see that it is fairly obvious that “hr” affects “count”. It should also be obvious that the relationship between “hr” and “count” is not linear.
+
+```{r}
+ggplot (bike, aes(x=hr, y=count)) + geom_boxplot() + theme_bw()
+```
+# Question 3 Build a linear regression model (using tidymodels) with “hr” to predict “count”. You will use this model to answer the next several questions.
+```{r}
+bike2_recipe = recipe( count ~ hr, bike) %>%
+  step_dummy(hr)
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike2_recipe)
+
+lm_fit = fit(lm_wflow, bike)
+```
+
+```{r}
+summary(lm_fit$fit$fit$fit) 
+```
+```{r}
+levels(bike$hr)
+```
+
+```{r}
+slope <- coef(lm_fit$fit$fit$fit)["hr_X23"]
+```
+
+
+```{r}
+ggplot (bike, aes(x=temp, y=count)) + geom_boxplot() + theme_bw()
+```
+#Question 7 Create a linear regression model (using tidymodels) with “hr” and “temp” to predict “count”. 
+```{r}
+bike_recipe = recipe( count ~ hr + temp , bike) %>%  
+  step_dummy(hr)
+lm_model2 = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow2 =
+  workflow() %>%
+  add_model(lm_model2) %>%
+  add_recipe(bike_recipe)
+
+lm_fit2 = fit(lm_wflow2, bike)
+```
+
+```{r}
+summary(lm_fit2$fit$fit$fit)
+```
+#  What is the value of the slope coefficient for "hr23" in this model (to three decimal places)?
+```{r}
+slope <- coef(lm_fit2$fit$fit$fit)["hr_X23"]
+```
+
+# Question 9 Create a linear regression model (using tidymodels as usual) with “temp” and “atemp” to predict “count”. What is the adjusted R-squared value (to four decimal places) of this model?
+```{r}
+bike1_recipe = recipe( count ~  temp + atemp, bike) 
+ 
+lm_model3 = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow3 =
+  workflow() %>%
+  add_model(lm_model3) %>%
+  add_recipe(bike1_recipe)
+
+lm_fit3 = fit(lm_wflow3, bike)
+```
+
+```{r}
+summary(lm_fit3$fit$fit$fit)
+```
+
